@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wheel of Names</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; }
+  #controls { margin-bottom: 1em; }
+  #wheel {
+    border: 5px solid #333;
+    border-radius: 50%;
+    margin: auto;
+    display: block;
+  }
+  #pointer {
+    width: 0;
+    height: 0;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-bottom: 30px solid #333;
+    margin: auto;
+    position: relative;
+    top: -10px;
+  }
+  .confetti {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    opacity: 0.8;
+    animation: fall linear forwards;
+  }
+  @keyframes fall {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(100vh); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div id="controls">
+  <textarea id="namesInput" rows="4" cols="40" placeholder="Enter names separated by comma or newline"></textarea><br>
+  <button id="updateWheel">Update Wheel</button>
+  <button id="spinBtn">Spin</button>
+</div>
+<div id="pointer"></div>
+<canvas id="wheel" width="500" height="500"></canvas>
+<p id="result"></p>
+<script>
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const spinBtn = document.getElementById('spinBtn');
+const updateBtn = document.getElementById('updateWheel');
+const namesInput = document.getElementById('namesInput');
+const resultEl = document.getElementById('result');
+let names = ['Alice', 'Bob', 'Charlie'];
+let spinning = false;
+let currentAngle = 0;
+const colors = ['#FF9AA2', '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA'];
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function drawWheel() {
+  const radius = canvas.width / 2;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const arc = 2 * Math.PI / names.length;
+  for (let i = 0; i < names.length; i++) {
+    const angle = i * arc;
+    ctx.beginPath();
+    ctx.moveTo(radius, radius);
+    ctx.arc(radius, radius, radius, angle, angle + arc);
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(radius, radius);
+    ctx.rotate(angle + arc / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#000';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(names[i], radius - 10, 0);
+    ctx.restore();
+  }
+}
+
+function clickSound() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = 1000;
+  gain.gain.value = 0.1;
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.05);
+}
+
+function launchConfetti() {
+  for (let i = 0; i < 100; i++) {
+    const div = document.createElement('div');
+    div.className = 'confetti';
+    div.style.left = Math.random() * 100 + 'vw';
+    div.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    div.style.animationDuration = 2 + Math.random() * 3 + 's';
+    document.body.appendChild(div);
+    div.addEventListener('animationend', () => div.remove());
+  }
+}
+
+function spin() {
+  if (spinning || names.length === 0) return;
+  spinning = true;
+  resultEl.textContent = '';
+  const arc = 360 / names.length;
+  const targetIndex = Math.floor(Math.random() * names.length);
+  const rotations = 3 + Math.floor(Math.random() * 3); // 3-5 rotations
+  const finalAngle = rotations * 360 + (targetIndex + 0.5) * arc;
+  let clickInterval = setInterval(clickSound, 100);
+  canvas.style.transition = 'transform 4s cubic-bezier(0.33, 1, 0.68, 1)';
+  canvas.style.transform = `rotate(${finalAngle}deg)`;
+  canvas.addEventListener('transitionend', function handler() {
+    canvas.removeEventListener('transitionend', handler);
+    clearInterval(clickInterval);
+    currentAngle = finalAngle % 360;
+    spinning = false;
+    const winningIndex = Math.floor(((360 - (currentAngle % 360)) % 360) / arc);
+    const winner = names[winningIndex];
+    resultEl.textContent = `Winner: ${winner}!`;
+    clickSound();
+    launchConfetti();
+  });
+}
+
+function updateNames() {
+  const input = namesInput.value.trim();
+  if (input) {
+    names = input.split(/[,\n]+/).map(n => n.trim()).filter(n => n);
+  } else {
+    names = [];
+  }
+  drawWheel();
+}
+
+updateBtn.addEventListener('click', updateNames);
+spinBtn.addEventListener('click', spin);
+drawWheel();
+</script>
+</body>
+</html>
